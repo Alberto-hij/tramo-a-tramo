@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tramo a Tramo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: una columna estrecha; entradas arriba, resultado grande, y debajo el cálculo explicado paso a paso con barras por tramo. */
+:root {
+  --bg: #FAFAF7;
+  --surface: #FFFFFF;
+  --ink: #1B1D1F;
+  --ink-soft: #5D6369;
+  --line: #E3E4E0;
+  --accent: #2F6B4F;        /* verde tinta: lo que se paga */
+  --accent-soft: #DCEBE2;
+  --t1: #CFE3D7; --t2: #9DC6AE; --t3: #5E9C7A; --t4: #2F6B4F;   /* tramos 10/20/30/40 % */
+  --warn: #9A5B00;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131514; --surface: #1B1E1C; --ink: #E9ECEA; --ink-soft: #9DA4A0; --line: #2B302D;
+    --accent: #7CC49C; --accent-soft: #23362B; --t1: #2A3D32; --t2: #3C6A51; --t3: #5A9A76; --t4: #8FD3AD; --warn: #E0A64A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131514; --surface: #1B1E1C; --ink: #E9ECEA; --ink-soft: #9DA4A0; --line: #2B302D;
+  --accent: #7CC49C; --accent-soft: #23362B; --t1: #2A3D32; --t2: #3C6A51; --t3: #5A9A76; --t4: #8FD3AD; --warn: #E0A64A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 16px; line-height: 1.5; }
+.wrap {
+  max-width: 640px; margin: 0 auto;
+  padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px;
+}
+header h1 { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; margin: 0; }
+header p { margin: 4px 0 0; color: var(--ink-soft); }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+.inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 600; }
+.field .hint { font-size: 13px; color: var(--ink-soft); }
+.box { position: relative; }
+.box input {
+  width: 100%; font: inherit; font-family: var(--font-num); font-size: 20px; padding: 12px 40px 12px 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.box input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.box input[aria-invalid="true"] { border-color: var(--warn); }
+.box span { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); font-size: 18px; pointer-events: none; }
+.err { font-size: 13px; color: var(--warn); min-height: 1em; }
+
+.result { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.headline { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+.headline .label { font-size: 14px; color: var(--ink-soft); }
+.headline .big { font-family: var(--font-num); font-size: clamp(32px, 8vw, 44px); font-weight: 600; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.rates { display: flex; gap: 22px; }
+.rates div { display: flex; flex-direction: column; }
+.rates .label { font-size: 13px; color: var(--ink-soft); }
+.rates .v { font-family: var(--font-num); font-size: 20px; font-weight: 600; }
+.summary { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin: 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.summary dt { color: var(--ink-soft); }
+.summary dd { margin: 0; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.summary .total dt, .summary .total dd { color: var(--ink); font-weight: 650; }
+
+h2 { font-size: 15px; font-weight: 650; margin: 0 0 12px; letter-spacing: 0.01em; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: paso; }
+.steps li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; counter-increment: paso; }
+.steps li::before { content: counter(paso); width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+.steps .t { font-weight: 600; }
+.steps .f { font-family: var(--font-num); font-size: 14px; color: var(--ink-soft); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.steps .f b { color: var(--ink); font-weight: 600; }
+.steps .note { font-size: 13px; color: var(--ink-soft); }
+
+.brackets { display: flex; flex-direction: column; gap: 10px; }
+.br { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+.br .name { font-size: 14px; }
+.br .name small { color: var(--ink-soft); font-size: 13px; }
+.br .amt { font-family: var(--font-num); font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.br .bar { grid-column: 1 / -1; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.br .bar i { display: block; height: 100%; width: 0; border-radius: 5px; transition: width .25s ease; }
+.br.off { opacity: .45; }
+.br .calc { grid-column: 1 / -1; font-family: var(--font-num); font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .br .bar i { transition: none; } }
+
+details { border-top: 1px solid var(--line); padding-top: 14px; }
+summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+td.ok { color: var(--accent); font-weight: 700; }
+td.ko { color: var(--warn); font-weight: 700; }
+.small { font-size: 13px; color: var(--ink-soft); }
+footer { font-size: 13px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>Tramo a Tramo</h1>
+    <p>Calculadora del Impuesto Ficticio sobre la Renta Universitaria (IFRU). Escribe tus datos y verás cada paso del cálculo.</p>
+  </header>
+
+  <section class="inputs" aria-label="Datos">
+    <div class="field">
+      <label for="ingresos">Ingresos anuales</label>
+      <div class="box"><input id="ingresos" inputmode="decimal" autocomplete="off" value="30.000" aria-describedby="ingresos-err"><span>€</span></div>
+      <div class="err" id="ingresos-err" role="status"></div>
+    </div>
+    <div class="field">
+      <label for="alquiler">Alquiler anual pagado</label>
+      <div class="box"><input id="alquiler" inputmode="decimal" autocomplete="off" value="4.800" aria-describedby="alquiler-err"><span>€</span></div>
+      <div class="err" id="alquiler-err" role="status"></div>
+    </div>
+  </section>
+
+  <section class="result" aria-live="polite" aria-label="Resultado">
+    <div class="headline">
+      <div>
+        <div class="label">Impuesto a pagar (cuota líquida)</div>
+        <div class="big" id="r-cuota">0,00 €</div>
+      </div>
+      <div class="rates">
+        <div><span class="label">Tipo medio</span><span class="v num" id="r-medio">0,00 %</span></div>
+        <div><span class="label">Tipo marginal</span><span class="v num" id="r-marginal">0 %</span></div>
+      </div>
+    </div>
+    <dl class="summary">
+      <dt>Base liquidable</dt><dd id="r-base">0,00 €</dd>
+      <dt>Cuota íntegra</dt><dd id="r-integra">0,00 €</dd>
+      <dt>Deducción por alquiler</dt><dd id="r-deduccion">0,00 €</dd>
+      <div class="total" style="display:contents"><dt>Cuota líquida</dt><dd id="r-liquida">0,00 €</dd></div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="h-tramos">
+    <h2 id="h-tramos">Tu base, tramo a tramo</h2>
+    <div class="brackets" id="tramos"></div>
+  </section>
+
+  <section aria-labelledby="h-pasos">
+    <h2 id="h-pasos">Cómo se ha calculado</h2>
+    <ol class="steps" id="pasos"></ol>
+  </section>
+
+  <details>
+    <summary>Comprobar con los 10 casos de prueba</summary>
+    <p class="small">La calculadora vuelve a calcular los casos de <span class="num">pruebas.csv</span> y los compara céntimo a céntimo con el resultado esperado.</p>
+    <div class="tablewrap"><table id="pruebas"><thead><tr><th>Caso</th><th>Descripción</th><th>Ingresos</th><th>Alquiler</th><th>Cuota líquida</th><th>Tipo medio</th><th>Marginal</th><th>¿Coincide?</th></tr></thead><tbody></tbody></table></div>
+  </details>
+
+  <footer>El IFRU es un impuesto inventado para una práctica docente. No sirve para calcular ningún impuesto real.</footer>
+</main>
+
+<script>
+(function () {
+  // ---------- Reglas del IFRU (especificacion.md) ----------
+  var MINIMO = 5000;
+  var TRAMOS = [            // [desde, hasta, tipo %]
+    [0, 10000, 10],
+    [10000, 25000, 20],
+    [25000, 50000, 30],
+    [50000, Infinity, 40]
+  ];
+  var DED_PCT = 10, DED_MAX = 600;
+
+  // Todo se calcula en céntimos enteros para evitar errores de coma flotante.
+  var toC = function (eur) { return Math.round(eur * 100); };
+  var round = function (x) { return Math.round(x + 1e-9); };   // redondeo al céntimo, mitades hacia arriba
+
+  function calcular(ingresos, alquiler) {
+    var ingC = toC(ingresos), alqC = toC(alquiler);
+    var baseC = Math.max(0, ingC - MINIMO * 100);
+    var detalle = TRAMOS.map(function (t) {
+      var d = t[0] * 100, h = t[1] * 100;
+      var parteC = Math.max(0, Math.min(baseC, h) - d);
+      return { desde: t[0], hasta: t[1], tipo: t[2], parteC: parteC, cuotaExacta: parteC * t[2] / 100 };
+    });
+    var integraC = round(detalle.reduce(function (s, t) { return s + t.cuotaExacta; }, 0));
+    var dedTeoricaC = round(alqC * DED_PCT / 100);
+    var dedC = Math.min(dedTeoricaC, DED_MAX * 100, integraC);
+    var liquidaC = integraC - dedC;
+    var medio = ingC > 0 ? Math.round(liquidaC / ingC * 10000) / 100 : 0;
+    var marginal = 0;
+    if (baseC > 0) TRAMOS.forEach(function (t) { if (baseC > t[0] * 100 && baseC <= t[1] * 100) marginal = t[2]; });
+    return { ingC: ingC, alqC: alqC, baseC: baseC, detalle: detalle, integraC: integraC, dedTeoricaC: dedTeoricaC, dedC: dedC, liquidaC: liquidaC, medio: medio, marginal: marginal };
+  }
+  window.tramoATramo = calcular;   // útil para comprobar en la consola
+
+  // ---------- Formato español ----------
+  var nf = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" });
+  var eur = function (c) { return nf.format(c / 100) + " €"; };
+  var pct = function (x, d) { return x.toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d }) + " %"; };
+  var miles = function (x) { return x === Infinity ? "en adelante" : new Intl.NumberFormat("es-ES", { useGrouping: "always" }).format(x) + " €"; };
+
+  // Acepta "30000", "30.000", "30.000,50", "30000,5" o "30000.50"
+  function leer(txt) {
+    var s = String(txt).replace(/\s|€/g, "");
+    if (s === "") return 0;
+    if (s.indexOf(",") >= 0) s = s.replace(/\./g, "").replace(",", ".");
+    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+    if (!/^\d+(\.\d+)?$/.test(s)) return NaN;
+    return Number(s);
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var colores = ["var(--t1)", "var(--t2)", "var(--t3)", "var(--t4)"];
+
+  function pintar() {
+    var ing = leer($("ingresos").value), alq = leer($("alquiler").value), ok = true;
+    [["ingresos", ing], ["alquiler", alq]].forEach(function (p) {
+      var bad = isNaN(p[1]);
+      $(p[0]).setAttribute("aria-invalid", bad ? "true" : "false");
+      $(p[0] + "-err").textContent = bad ? "Escribe una cantidad en euros, por ejemplo 25.000 o 1.250,50." : "";
+      if (bad) ok = false;
+    });
+    if (!ok) return;
+    var r = calcular(ing, alq);
+
+    $("r-cuota").textContent = eur(r.liquidaC);
+    $("r-medio").textContent = pct(r.medio, 2);
+    $("r-marginal").textContent = r.marginal + " %";
+    $("r-base").textContent = eur(r.baseC);
+    $("r-integra").textContent = eur(r.integraC);
+    $("r-deduccion").textContent = (r.dedC > 0 ? "− " : "") + eur(r.dedC);
+    $("r-liquida").textContent = eur(r.liquidaC);
+
+    // Tramos
+    var cont = $("tramos"); cont.replaceChildren();
+    r.detalle.forEach(function (t, i) {
+      var ancho = t.hasta === Infinity ? Math.max(t.parteC, 1) : (t.hasta - t.desde) * 100;
+      var lleno = t.hasta === Infinity ? (t.parteC > 0 ? 1 : 0) : t.parteC / ancho;
+      var row = document.createElement("div"); row.className = "br" + (t.parteC === 0 ? " off" : "");
+      var name = document.createElement("div"); name.className = "name";
+      name.textContent = "Tramo " + (i + 1) + " · " + t.tipo + " % ";
+      var sm = document.createElement("small"); sm.textContent = "(de " + miles(t.desde) + (t.hasta === Infinity ? " en adelante)" : " a " + miles(t.hasta) + ")");
+      name.appendChild(sm);
+      var amt = document.createElement("div"); amt.className = "amt"; amt.textContent = eur(round(t.cuotaExacta));
+      var bar = document.createElement("div"); bar.className = "bar";
+      var fill = document.createElement("i"); fill.style.background = colores[i]; fill.style.width = (lleno * 100).toFixed(1) + "%";
+      bar.appendChild(fill);
+      var calc = document.createElement("div"); calc.className = "calc";
+      calc.textContent = t.parteC === 0 ? "Tu base no llega a este tramo." : eur(t.parteC) + " × " + t.tipo + " % = " + nf.format(t.cuotaExacta / 100) + " €";
+      row.append(name, amt, bar, calc);
+      cont.appendChild(row);
+    });
+
+    // Pasos
+    var pasos = $("pasos"); pasos.replaceChildren();
+    function paso(titulo, formula, nota) {
+      var li = document.createElement("li"), body = document.createElement("div");
+      var t = document.createElement("div"); t.className = "t"; t.textContent = titulo;
+      var f = document.createElement("div"); f.className = "f";
+      formula.forEach(function (part) { if (typeof part === "string") f.appendChild(document.createTextNode(part)); else { var b = document.createElement("b"); b.textContent = part.b; f.appendChild(b); } });
+      body.append(t, f);
+      if (nota) { var n = document.createElement("div"); n.className = "note"; n.textContent = nota; body.appendChild(n); }
+      li.append(document.createElement("span"), body); li.firstChild.remove();
+      pasos.appendChild(li);
+    }
+    var bruta = r.ingC - MINIMO * 100;
+    paso("Base liquidable", [eur(r.ingC) + " − " + eur(MINIMO * 100) + " de mínimo personal = ", { b: eur(r.baseC) }],
+      bruta < 0 ? "La resta sale negativa, así que la base es 0." : "El mínimo personal de 5.000 € no tributa.");
+    var usados = r.detalle.filter(function (t) { return t.parteC > 0; });
+    paso("Cuota íntegra", usados.length === 1 ? [eur(usados[0].parteC) + " × " + usados[0].tipo + " % = ", { b: eur(r.integraC) }] : usados.length ? [usados.map(function (t) { return nf.format(t.cuotaExacta / 100); }).join(" + ") + " = ", { b: eur(r.integraC) }] : ["Sin base no hay cuota: ", { b: eur(0) }],
+      usados.length > 1 ? "Cada tipo se aplica solo a la parte de la base que cae en su tramo (ver barras de arriba)." : null);
+    var notaDed = r.alqC === 0 ? "No has indicado alquiler, así que no hay deducción."
+      : r.dedC === DED_MAX * 100 && r.dedTeoricaC > DED_MAX * 100 ? "El 10 % superaría el máximo, así que se aplica el tope de 600 €."
+      : r.dedC < r.dedTeoricaC ? "La deducción se limita a la cuota íntegra para que el impuesto no salga negativo."
+      : "El 10 % del alquiler está por debajo del máximo de 600 €.";
+    paso("Deducción por alquiler", ["10 % de " + eur(r.alqC) + " = " + eur(r.dedTeoricaC) + " → se aplica ", { b: eur(r.dedC) }], notaDed);
+    paso("Cuota líquida", [eur(r.integraC) + " − " + eur(r.dedC) + " = ", { b: eur(r.liquidaC) }], "Es lo que pagas.");
+    paso("Tipo medio", r.ingC > 0 ? [eur(r.liquidaC) + " ÷ " + eur(r.ingC) + " × 100 = ", { b: pct(r.medio, 2) }] : ["Sin ingresos el tipo medio es ", { b: "0,00 %" }],
+      "El porcentaje de tus ingresos que se va en el impuesto.");
+    paso("Tipo marginal", ["El último euro de tu base cae en el tramo del ", { b: r.marginal + " %" }],
+      r.marginal ? "Es lo que pagarías por cada euro adicional que ganes (sin contar la deducción)." : "Con base 0 no se paga nada por el siguiente euro.");
+  }
+
+  // ---------- Casos de prueba (pruebas.csv) ----------
+  var CASOS = [
+    ["C01", 0, 0, "Sin ingresos", 0, 0, 0, 0, 0, 0],
+    ["C02", 4000, 0, "Por debajo del mínimo personal", 0, 0, 0, 0, 0, 0],
+    ["C03", 15000, 0, "Justo en el límite del primer tramo", 10000, 1000, 0, 1000, 6.67, 10],
+    ["C04", 20000, 0, "Dos tramos", 15000, 2000, 0, 2000, 10, 20],
+    ["C05", 40000, 0, "Tres tramos", 35000, 7000, 0, 7000, 17.5, 30],
+    ["C06", 80000, 0, "Cuatro tramos", 75000, 21500, 0, 21500, 26.88, 40],
+    ["C07", 20000, 3000, "Deducción por alquiler normal", 15000, 2000, 300, 1700, 8.5, 20],
+    ["C08", 40000, 7200, "Deducción por alquiler con tope de 600 €", 35000, 7000, 600, 6400, 16, 30],
+    ["C09", 6000, 3000, "La deducción no puede dejar la cuota en negativo", 1000, 100, 100, 0, 0, 10],
+    ["C10", 30000.5, 4800, "Céntimos y redondeo", 25000.5, 4000.15, 480, 3520.15, 11.73, 30]
+  ];
+  var tb = document.querySelector("#pruebas tbody");
+  var todos = 0;
+  CASOS.forEach(function (c) {
+    var r = calcular(c[1], c[2]);
+    var ok = r.baseC === toC(c[4]) && r.integraC === toC(c[5]) && r.dedC === toC(c[6]) && r.liquidaC === toC(c[7]) && Math.abs(r.medio - c[8]) < 1e-9 && r.marginal === c[9];
+    if (ok) todos++;
+    var tr = document.createElement("tr");
+    [c[0], c[3], eur(r.ingC), eur(r.alqC), eur(r.liquidaC), pct(r.medio, 2), r.marginal + " %", ok ? "Sí" : "No"].forEach(function (v, i, a) {
+      var td = document.createElement("td"); td.textContent = v; if (i === a.length - 1) td.className = ok ? "ok" : "ko"; tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  document.querySelector("details summary").textContent = "Comprobar con los 10 casos de prueba (" + todos + " de " + CASOS.length + " coinciden)";
+  window.tramoATramoPruebas = todos;
+
+  $("ingresos").addEventListener("input", pintar);
+  $("alquiler").addEventListener("input", pintar);
+  pintar();
+})();
+</script>
+</body>
+</html>
